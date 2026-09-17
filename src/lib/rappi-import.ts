@@ -82,15 +82,25 @@ function cellDate(row: ExcelJS.Row, col?: number): Date | null {
   return null;
 }
 
+function isPlausibleDate(raw: string): boolean {
+  const year = Number(raw.slice(0, 4));
+  const month = Number(raw.slice(4, 6));
+  const day = Number(raw.slice(6, 8));
+  return year >= 2000 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31;
+}
+
 function periodFromFileName(fileName: string): { start: string; end: string } {
-  const match = fileName.match(/(\d{8})_(\d{8})/);
-  if (!match) {
+  // El nombre trae dos fechas AAAAMMDD, pero el separador varía según cómo
+  // se haya guardado/renombrado el archivo (_, espacios, corchetes, etc.),
+  // así que buscamos cualquier par de secuencias de 8 dígitos que parezcan fechas.
+  const candidates = (fileName.match(/\d{8}/g) ?? []).filter(isPlausibleDate);
+  if (candidates.length < 2) {
     throw new Error(
-      `No se pudo extraer el período del nombre del archivo "${fileName}". Se espera algo como SEM36_20260831_20260906_....xlsx`
+      `No se pudo extraer el período del nombre del archivo "${fileName}". Debe contener dos fechas en formato AAAAMMDD, ej. 20260831 y 20260906.`
     );
   }
   const toIso = (raw: string) => `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
-  return { start: toIso(match[1]), end: toIso(match[2]) };
+  return { start: toIso(candidates[0]), end: toIso(candidates[1]) };
 }
 
 async function resolveCompanyId(rawName: string | null, warnings: string[]): Promise<number | null> {
