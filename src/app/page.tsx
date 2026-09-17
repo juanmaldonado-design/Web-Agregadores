@@ -11,13 +11,16 @@ export default function Home() {
           Resumen ejecutivo de ventas, comisiones y pagos de los agregadores
           de delivery (Rappi, Pedidos Ya, Justo, Uber Eats).
         </p>
-        <p className="text-sm text-zinc-500 dark:text-zinc-500">
-          El dashboard con los números se construirá en el próximo paso.
-        </p>
-        <div>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/dashboard"
+            className="inline-block rounded bg-black px-5 py-2.5 text-sm font-medium text-white dark:bg-zinc-50 dark:text-black"
+          >
+            Ver dashboard
+          </Link>
           <Link
             href="/importar"
-            className="inline-block rounded bg-black px-5 py-2.5 text-sm font-medium text-white dark:bg-zinc-50 dark:text-black"
+            className="inline-block rounded border border-zinc-300 px-5 py-2.5 text-sm font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
           >
             Subir Excel de Rappi
           </Link>
