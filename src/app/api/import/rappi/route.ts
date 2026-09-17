@@ -40,7 +40,24 @@ export async function POST(request: NextRequest) {
     const result = await importRappiWorkbook(workbook, file.name);
     return NextResponse.json({ ok: true, result });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Error desconocido";
+    console.error("Error importando Excel de Rappi:", err);
+    const message = errorMessage(err);
     return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  // Los errores de Supabase (PostgrestError) no son instancias de Error,
+  // pero sí traen un campo "message" (y a veces "hint"/"details").
+  if (err && typeof err === "object" && "message" in err) {
+    const e = err as { message?: unknown; hint?: unknown; details?: unknown };
+    const parts = [e.message, e.hint, e.details].filter((p) => typeof p === "string" && p.length > 0);
+    if (parts.length > 0) return parts.join(" — ");
+  }
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return "Error desconocido";
   }
 }
