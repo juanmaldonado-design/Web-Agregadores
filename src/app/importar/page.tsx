@@ -28,7 +28,8 @@ export default function ImportarPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setStatus({ kind: "error", message: data.error ?? "Error al subir el archivo." });
+        const diag = data.supabaseUrlEnv ? `\n\n(Supabase URL configurada: ${data.supabaseUrlEnv})` : "";
+        setStatus({ kind: "error", message: (data.error ?? "Error al subir el archivo.") + diag });
         return;
       }
 

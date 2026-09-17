@@ -42,7 +42,12 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("Error importando Excel de Rappi:", err);
     const message = errorMessage(err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    // NEXT_PUBLIC_SUPABASE_URL es pública por diseño (no es un secreto), así
+    // que es seguro devolverla acá para diagnosticar problemas de configuración.
+    return NextResponse.json(
+      { error: message, supabaseUrlEnv: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "(no configurada)" },
+      { status: 500 }
+    );
   }
 }
 
@@ -55,8 +60,9 @@ function errorMessage(err: unknown): string {
     const parts = [e.message, e.hint, e.details].filter((p) => typeof p === "string" && p.length > 0);
     if (parts.length > 0) return parts.join(" — ");
   }
+  if (typeof err === "string") return err.slice(0, 300);
   try {
-    return JSON.stringify(err);
+    return JSON.stringify(err).slice(0, 300);
   } catch {
     return "Error desconocido";
   }
