@@ -32,8 +32,9 @@ export default function ImportarPage() {
         return;
       }
 
-      const { periodStart, periodEnd, ordersImported, summaryRowsImported, warnings } = data.result;
-      let message = `Semana ${periodStart} → ${periodEnd}: ${ordersImported} pedidos y ${summaryRowsImported} filas de resumen cargadas correctamente.`;
+      const { weekLabel, periodStart, periodEnd, ordersImported, summaryRowsImported, warnings } = data.result;
+      const weekPrefix = weekLabel ? `${weekLabel} (${periodStart} → ${periodEnd})` : `Semana ${periodStart} → ${periodEnd}`;
+      let message = `${weekPrefix}: ${ordersImported} pedidos y ${summaryRowsImported} filas de resumen cargadas correctamente.`;
       if (warnings?.length) {
         message += `\n\nAvisos:\n${warnings.map((w: string) => `- ${w}`).join("\n")}`;
       }

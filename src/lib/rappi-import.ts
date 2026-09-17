@@ -30,6 +30,7 @@ const COMPANY_ALIASES: Record<string, string> = {
 
 export interface RappiImportResult {
   fileName: string;
+  weekLabel: string | null;
   periodStart: string;
   periodEnd: string;
   ordersImported: number;
@@ -101,6 +102,11 @@ function periodFromFileName(fileName: string): { start: string; end: string } {
   }
   const toIso = (raw: string) => `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
   return { start: toIso(candidates[0]), end: toIso(candidates[1]) };
+}
+
+function weekLabelFromFileName(fileName: string): string | null {
+  const match = fileName.match(/SEM\s*0*(\d{1,2})/i);
+  return match ? `SEM${match[1]}` : null;
 }
 
 async function resolveCompanyId(rawName: string | null, warnings: string[]): Promise<number | null> {
@@ -284,6 +290,7 @@ export async function importRappiWorkbook(
   fileName: string
 ): Promise<RappiImportResult> {
   const { start: periodStart, end: periodEnd } = periodFromFileName(fileName);
+  const weekLabel = weekLabelFromFileName(fileName);
   const warnings: string[] = [];
 
   const { data: platform, error: platformError } = await supabaseAdmin
@@ -317,5 +324,5 @@ export async function importRappiWorkbook(
     warnings
   );
 
-  return { fileName, periodStart, periodEnd, ordersImported, summaryRowsImported, warnings };
+  return { fileName, weekLabel, periodStart, periodEnd, ordersImported, summaryRowsImported, warnings };
 }
