@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-6 font-sans dark:bg-black">
@@ -10,9 +12,16 @@ export default function Home() {
           de delivery (Rappi, Pedidos Ya, Justo, Uber Eats).
         </p>
         <p className="text-sm text-zinc-500 dark:text-zinc-500">
-          Entorno en configuración inicial. El dashboard se construirá una
-          vez definida la importación de datos desde Supabase.
+          El dashboard con los números se construirá en el próximo paso.
         </p>
+        <div>
+          <Link
+            href="/importar"
+            className="inline-block rounded bg-black px-5 py-2.5 text-sm font-medium text-white dark:bg-zinc-50 dark:text-black"
+          >
+            Subir Excel de Rappi
+          </Link>
+        </div>
       </main>
     </div>
   );
