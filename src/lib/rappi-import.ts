@@ -224,10 +224,14 @@ async function importOrders(
     });
   }
 
+  // No se usa upsert: el "ID de la órden" de Rappi no es único por fila (un
+  // mismo pedido puede traer una línea 'ORDEN' y otra 'COMPENSACIÓN', a veces
+  // más de una). La idempotencia de re-subir el mismo archivo se logra
+  // borrando el import anterior del mismo período antes de insertar.
   const chunkSize = 500;
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize);
-    const { error } = await supabaseAdmin.from("orders").upsert(chunk, { onConflict: "platform_id,external_order_id" });
+    const { error } = await supabaseAdmin.from("orders").insert(chunk);
     if (error) throw error;
   }
 
@@ -300,6 +304,17 @@ export async function importRappiWorkbook(
     .single();
   if (platformError || !platform) throw platformError ?? new Error("Plataforma 'rappi' no encontrada");
   const platformId = platform.id as number;
+
+  // Si ya se había subido un archivo para esta misma plataforma+semana, se
+  // borra ese import anterior (y en cascada sus orders/weekly_summary) para
+  // que volver a subir el mismo archivo reemplace los datos en vez de sumarlos.
+  const { error: deleteError } = await supabaseAdmin
+    .from("imports")
+    .delete()
+    .eq("platform_id", platformId)
+    .eq("period_start", periodStart)
+    .eq("period_end", periodEnd);
+  if (deleteError) throw deleteError;
 
   const { data: importRow, error: importError } = await supabaseAdmin
     .from("imports")

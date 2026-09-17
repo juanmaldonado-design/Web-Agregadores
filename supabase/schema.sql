@@ -75,8 +75,11 @@ create table if not exists orders (
   manual_adjustment numeric(14, 2) not null default 0, -- 'Valor Ajustes Manuales'
   net_amount numeric(14, 2) not null default 0,       -- 'Valor Neto'
   raw jsonb,                          -- fila completa original, tal cual el Excel
-  created_at timestamptz not null default now(),
-  unique (platform_id, external_order_id)
+  created_at timestamptz not null default now()
+  -- Sin "unique" en external_order_id: un mismo "ID de la órden" de Rappi
+  -- puede repetirse en más de una fila (ej. una línea 'ORDEN' y otra
+  -- 'COMPENSACIÓN' del mismo pedido). La idempotencia al re-subir un Excel
+  -- se maneja borrando el import anterior del mismo período, no con unique.
 );
 
 create index if not exists orders_company_period_idx
@@ -84,6 +87,12 @@ create index if not exists orders_company_period_idx
 
 create index if not exists orders_import_idx
   on orders (import_id);
+
+create index if not exists orders_external_order_id_idx
+  on orders (platform_id, external_order_id);
+
+-- Si ya habías corrido una versión anterior del schema con el unique viejo:
+alter table orders drop constraint if exists orders_platform_id_external_order_id_key;
 
 -- Resumen ejecutivo por empresa y semana (hoja "Resumen Cuadratura" en Rappi):
 -- compara lo que la plataforma dice depositar/facturar contra lo que realmente
