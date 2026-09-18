@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 
-type Status =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "success"; message: string }
-  | { kind: "error"; message: string };
+type FileStatus = "pending" | "loading" | "success" | "error";
+
+interface FileResult {
+  name: string;
+  status: FileStatus;
+  message?: string;
+}
 
 interface ImportRow {
   id: string;
@@ -18,9 +20,10 @@ interface ImportRow {
 }
 
 export default function ImportarPage() {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [secret, setSecret] = useState("");
-  const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const [uploading, setUploading] = useState(false);
+  const [results, setResults] = useState<FileResult[]>([]);
   const [imports, setImports] = useState<ImportRow[] | null>(null);
   const [importsError, setImportsError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -65,12 +68,7 @@ export default function ImportarPage() {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!file) return;
-
-    setStatus({ kind: "loading" });
-
+  async function uploadOne(file: File): Promise<FileResult> {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("secret", secret);
@@ -80,23 +78,40 @@ export default function ImportarPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        const diag = data.supabaseUrlEnv ? `\n\n(Supabase URL configurada: ${data.supabaseUrlEnv})` : "";
-        setStatus({ kind: "error", message: (data.error ?? "Error al subir el archivo.") + diag });
-        return;
+        const diag = data.supabaseUrlEnv ? ` (Supabase URL configurada: ${data.supabaseUrlEnv})` : "";
+        return { name: file.name, status: "error", message: (data.error ?? "Error al subir el archivo.") + diag };
       }
 
       const { weekLabel, periodStart, periodEnd, ordersImported, summaryRowsImported, warnings } = data.result;
       const weekPrefix = weekLabel ? `${weekLabel} (${periodStart} → ${periodEnd})` : `Semana ${periodStart} → ${periodEnd}`;
-      let message = `${weekPrefix}: ${ordersImported} pedidos y ${summaryRowsImported} filas de resumen cargadas correctamente.`;
+      let message = `${weekPrefix}: ${ordersImported} pedidos y ${summaryRowsImported} filas de resumen.`;
       if (warnings?.length) {
-        message += `\n\nAvisos:\n${warnings.map((w: string) => `- ${w}`).join("\n")}`;
+        message += ` Avisos: ${warnings.join("; ")}`;
       }
-      setStatus({ kind: "success", message });
-      setFile(null);
-      loadImports();
+      return { name: file.name, status: "success", message };
     } catch {
-      setStatus({ kind: "error", message: "No se pudo conectar con el servidor. Intenta de nuevo." });
+      return { name: file.name, status: "error", message: "No se pudo conectar con el servidor." };
     }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (files.length === 0) return;
+
+    setUploading(true);
+    setResults(files.map((f) => ({ name: f.name, status: "pending" })));
+
+    // Se suben de a uno (no en paralelo) para no saturar la base de datos
+    // y para poder mostrar el progreso archivo por archivo.
+    for (let i = 0; i < files.length; i++) {
+      setResults((prev) => prev.map((r, idx) => (idx === i ? { ...r, status: "loading" } : r)));
+      const result = await uploadOne(files[i]);
+      setResults((prev) => prev.map((r, idx) => (idx === i ? result : r)));
+    }
+
+    setUploading(false);
+    setFiles([]);
+    loadImports();
   }
 
   return (
@@ -105,23 +120,32 @@ export default function ImportarPage() {
         <div>
           <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">Subir Excel de Rappi</h1>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Sube el archivo semanal (el que trae las hojas &quot;Consolidado Semanal&quot; y
-            &quot;Resumen Cuadratura&quot;). Subir el mismo archivo de nuevo reemplaza los datos
-            de esa semana, no los duplica.
+            Sube uno o varios archivos semanales (los que traen las hojas &quot;Consolidado
+            Semanal&quot; y &quot;Resumen Cuadratura&quot;). Subir el mismo archivo de nuevo
+            reemplaza los datos de esa semana, no los duplica.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Archivo Excel (.xlsx)
+            Archivos Excel (.xlsx) — puedes seleccionar varios
             <input
               type="file"
               accept=".xlsx"
+              multiple
               required
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
               className="rounded border border-zinc-300 p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-black file:px-3 file:py-1.5 file:text-sm file:text-white dark:border-zinc-700 dark:file:bg-zinc-50 dark:file:text-black"
             />
           </label>
+
+          {files.length > 0 && (
+            <ul className="text-sm text-zinc-600 dark:text-zinc-400">
+              {files.map((f) => (
+                <li key={f.name}>• {f.name}</li>
+              ))}
+            </ul>
+          )}
 
           <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Clave de acceso
@@ -136,22 +160,37 @@ export default function ImportarPage() {
 
           <button
             type="submit"
-            disabled={status.kind === "loading" || !file}
+            disabled={uploading || files.length === 0}
             className="rounded bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-50 dark:text-black"
           >
-            {status.kind === "loading" ? "Subiendo..." : "Subir"}
+            {uploading ? "Subiendo..." : files.length > 1 ? `Subir ${files.length} archivos` : "Subir"}
           </button>
         </form>
 
-        {status.kind === "success" && (
-          <pre className="whitespace-pre-wrap rounded border border-green-300 bg-green-50 p-4 text-sm text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
-            {status.message}
-          </pre>
-        )}
-        {status.kind === "error" && (
-          <pre className="whitespace-pre-wrap rounded border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
-            {status.message}
-          </pre>
+        {results.length > 0 && (
+          <ul className="flex flex-col gap-2">
+            {results.map((r) => (
+              <li
+                key={r.name}
+                className={`whitespace-pre-wrap rounded border p-3 text-sm ${
+                  r.status === "success"
+                    ? "border-green-300 bg-green-50 text-green-900 dark:border-green-800 dark:bg-green-950 dark:text-green-200"
+                    : r.status === "error"
+                      ? "border-red-300 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
+                      : "border-zinc-300 bg-zinc-50 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400"
+                }`}
+              >
+                <p className="font-medium">
+                  {r.status === "pending" && "⏳ "}
+                  {r.status === "loading" && "⏳ Subiendo… "}
+                  {r.status === "success" && "✅ "}
+                  {r.status === "error" && "❌ "}
+                  {r.name}
+                </p>
+                {r.message && <p className="mt-1">{r.message}</p>}
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
