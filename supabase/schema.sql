@@ -91,6 +91,9 @@ create index if not exists orders_import_idx
 create index if not exists orders_external_order_id_idx
   on orders (platform_id, external_order_id);
 
+create index if not exists orders_store_date_idx
+  on orders (store_id, order_created_at);
+
 -- Si ya habías corrido una versión anterior del schema con el unique viejo:
 alter table orders drop constraint if exists orders_platform_id_external_order_id_key;
 

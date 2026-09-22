@@ -154,6 +154,9 @@ export default async function DashboardPage({
               Ver
             </button>
           </form>
+          <Link href="/dashboard/detalle" className="text-sm text-zinc-600 underline dark:text-zinc-400">
+            Detalle por local
+          </Link>
           <Link href="/importar" className="text-sm text-zinc-600 underline dark:text-zinc-400">
             Subir Excel
           </Link>

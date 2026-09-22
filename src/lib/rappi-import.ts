@@ -83,6 +83,41 @@ function cellDate(row: ExcelJS.Row, col?: number): Date | null {
   return null;
 }
 
+const SPANISH_MONTHS: Record<string, number> = {
+  ene: 1, feb: 2, mar: 3, abr: 4, may: 5, jun: 6,
+  jul: 7, ago: 8, sep: 9, sept: 9, oct: 10, nov: 11, dic: 12,
+};
+
+// "Fecha de creación orden" viene como texto en español, ej.
+// "lun. 31 ago. 2026, 9:37:36 a. m." o "mar. 01 sept. 2026, 10:14:37 a. m."
+// Se guarda como si fuera UTC (ignorando la zona horaria real) para que la
+// fecha/hora quede exactamente igual a la del Excel al leerla de vuelta con
+// getUTC*/toISOString — no para comparar con otras zonas horarias.
+function parseSpanishOrderDateTime(row: ExcelJS.Row, col?: number): Date | null {
+  if (!col) return null;
+  const v = row.getCell(col).value;
+  if (v instanceof Date) return v;
+  if (typeof v !== "string") return null;
+
+  const m = v
+    .trim()
+    .match(
+      /^\S+\.?\s+(\d{1,2})\s+([a-záéíóúñ]+)\.?\s+(\d{4}),\s*(\d{1,2}):(\d{2}):(\d{2})\s*(a|p)\.?\s*m\.?$/i
+    );
+  if (!m) return null;
+
+  const [, dayStr, monthStr, yearStr, hourStr, minuteStr, secondStr, ampm] = m;
+  const month = SPANISH_MONTHS[monthStr.toLowerCase()];
+  if (!month) return null;
+
+  let hour = parseInt(hourStr, 10) % 12;
+  if (ampm.toLowerCase() === "p") hour += 12;
+
+  return new Date(
+    Date.UTC(parseInt(yearStr, 10), month - 1, parseInt(dayStr, 10), hour, parseInt(minuteStr, 10), parseInt(secondStr, 10))
+  );
+}
+
 function isPlausibleDate(raw: string): boolean {
   const year = Number(raw.slice(0, 4));
   const month = Number(raw.slice(4, 6));
@@ -212,7 +247,7 @@ async function importOrders(
       store_id: storeId,
       external_order_id: externalOrderId,
       paidlot_id: cellText(row, col("ID del paidlot")),
-      order_created_at: cellDate(row, col("Fecha de creación orden")),
+      order_created_at: parseSpanishOrderDateTime(row, col("Fecha de creación orden")),
       transaction_type: cellText(row, col("Tipo de transacción")),
       order_status: cellText(row, col("Estado de la órden")),
       gross_sales: cellNumber(row, col("Venta Bruta")),
