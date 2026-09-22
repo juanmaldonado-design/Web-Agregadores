@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import DashboardHero from "@/components/DashboardHero";
 
 export const dynamic = "force-dynamic";
 
@@ -125,35 +126,42 @@ export default async function DashboardPage({
     { monto_a_depositar: 0, banco_recibido: 0, monto_a_facturar_neto: 0, facturado_xml_neto: 0, dif_banco: 0, dif_factura: 0 }
   );
 
+  const companyCount = new Set(rows.map((r) => r.company_id)).size;
+
   return (
-    <div className="mx-auto flex min-h-screen max-w-5xl flex-col gap-8 px-6 py-16 font-sans">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">Resumen ejecutivo — Rappi</h1>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Semana {selected.period_start} → {selected.period_end}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <form className="flex items-center gap-2">
-            <select
-              name="period"
-              defaultValue={`${selected.period_start}_${selected.period_end}`}
-              className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-            >
-              {periods.map((p) => {
-                const key = `${p.period_start}_${p.period_end}`;
-                return (
-                  <option key={key} value={key}>
-                    {p.period_start} → {p.period_end}
-                  </option>
-                );
-              })}
-            </select>
-            <button type="submit" className="rounded border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-700">
-              Ver
-            </button>
-          </form>
+    <div className="mx-auto flex min-h-screen max-w-5xl flex-col gap-8 px-6 py-10 font-sans">
+      <DashboardHero
+        eyebrow="Agregadores de delivery"
+        title="Resumen ejecutivo"
+        accent="— Rappi"
+        subtitle={`Ventas, comisiones y conciliación con el banco, semana ${selected.period_start} → ${selected.period_end}.`}
+        badges={[`${companyCount} empresas`, `Semana ${selected.period_start} → ${selected.period_end}`]}
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <form className="flex items-center gap-2">
+          <select
+            name="period"
+            defaultValue={`${selected.period_start}_${selected.period_end}`}
+            className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            {periods.map((p) => {
+              const key = `${p.period_start}_${p.period_end}`;
+              return (
+                <option key={key} value={key}>
+                  {p.period_start} → {p.period_end}
+                </option>
+              );
+            })}
+          </select>
+          <button
+            type="submit"
+            className="rounded bg-[#eda100] px-3 py-1.5 text-sm font-medium text-black transition-colors hover:bg-[#c98500]"
+          >
+            Ver semana
+          </button>
+        </form>
+        <div className="flex items-center gap-4">
           <Link href="/dashboard/detalle" className="text-sm text-zinc-600 underline dark:text-zinc-400">
             Detalle por local
           </Link>

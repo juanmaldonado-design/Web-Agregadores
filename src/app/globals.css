@@ -67,3 +67,29 @@ body {
 .animate-backdrop-in {
   animation: backdrop-in 0.2s ease-out both;
 }
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: var(--twinkle-min, 0.15);
+  }
+  50% {
+    opacity: var(--twinkle-max, 0.7);
+  }
+}
+
+.hero-dots span {
+  animation: twinkle 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-dots span {
+    animation: none;
+    opacity: 0.35;
+  }
+  .animate-fade-in-up,
+  .animate-scale-in,
+  .animate-backdrop-in {
+    animation: none;
+  }
+}
