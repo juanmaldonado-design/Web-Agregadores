@@ -93,3 +93,69 @@ body {
     animation: none;
   }
 }
+
+/* Botón "3D": relieve tipo botón físico + brillo que lo recorre al hover */
+.btn-3d {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transform: translateZ(0);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.btn-3d.btn-3d-primary {
+  box-shadow:
+    0 5px 0 0 var(--btn-3d-shadow, #a8720a),
+    0 8px 18px -4px rgba(237, 161, 0, 0.5);
+}
+
+.btn-3d.btn-3d-primary:hover {
+  box-shadow:
+    0 6px 0 0 var(--btn-3d-shadow, #a8720a),
+    0 12px 22px -4px rgba(237, 161, 0, 0.6);
+  transform: translateY(-2px);
+}
+
+.btn-3d.btn-3d-primary:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 2px 0 0 var(--btn-3d-shadow, #a8720a),
+    0 4px 10px -2px rgba(237, 161, 0, 0.45);
+}
+
+.btn-3d-shine {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.btn-3d-shine::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  left: -60%;
+  width: 40%;
+  height: 140%;
+  background: linear-gradient(115deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.55s ease;
+}
+
+.btn-3d:hover .btn-3d-shine::before {
+  left: 130%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-3d,
+  .btn-3d.btn-3d-primary:hover,
+  .btn-3d.btn-3d-primary:active {
+    transform: none !important;
+    transition: none;
+  }
+  .btn-3d-shine::before {
+    display: none;
+  }
+}

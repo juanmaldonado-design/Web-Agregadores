@@ -2,6 +2,7 @@ import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import DashboardHero from "@/components/DashboardHero";
 import LogoutButton from "@/components/LogoutButton";
+import { Button3D } from "@/components/Button3D";
 
 export const dynamic = "force-dynamic";
 
@@ -155,12 +156,9 @@ export default async function DashboardPage({
               );
             })}
           </select>
-          <button
-            type="submit"
-            className="rounded bg-[#eda100] px-3 py-1.5 text-sm font-medium text-black transition-colors hover:bg-[#c98500]"
-          >
+          <Button3D type="submit" className="!px-3 !py-1.5">
             Ver semana
-          </button>
+          </Button3D>
         </form>
         <div className="flex items-center gap-4">
           <Link href="/dashboard/detalle" className="text-sm text-zinc-600 underline dark:text-zinc-400">

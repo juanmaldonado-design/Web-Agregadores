@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Button3D } from "@/components/Button3D";
 
 type FileStatus = "pending" | "loading" | "success" | "error";
 
@@ -158,13 +159,9 @@ export default function ImportarPage() {
             />
           </label>
 
-          <button
-            type="submit"
-            disabled={uploading || files.length === 0}
-            className="rounded bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-50 dark:text-black"
-          >
+          <Button3D type="submit" disabled={uploading || files.length === 0} fullWidth className="disabled:opacity-50">
             {uploading ? "Subiendo..." : files.length > 1 ? `Subir ${files.length} archivos` : "Subir"}
-          </button>
+          </Button3D>
         </form>
 
         {results.length > 0 && (

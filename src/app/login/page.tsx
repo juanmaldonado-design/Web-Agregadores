@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardHero from "@/components/DashboardHero";
+import { Button3D } from "@/components/Button3D";
 
 function LoginForm() {
   const router = useRouter();
@@ -47,13 +48,9 @@ function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           className="rounded border border-zinc-300 p-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         />
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded bg-[#eda100] px-4 py-2.5 text-sm font-medium text-black transition-colors hover:bg-[#c98500] disabled:opacity-50"
-        >
+        <Button3D type="submit" disabled={loading} fullWidth className="disabled:opacity-50">
           {loading ? "Entrando..." : "Entrar"}
-        </button>
+        </Button3D>
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       </form>
     </div>

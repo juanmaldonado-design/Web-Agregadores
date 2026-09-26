@@ -1,5 +1,5 @@
-import Link from "next/link";
 import DashboardHero from "@/components/DashboardHero";
+import { LinkButton3D } from "@/components/Button3D";
 
 export default function Home() {
   return (
@@ -10,19 +10,11 @@ export default function Home() {
         subtitle="Resumen ejecutivo de ventas, comisiones y pagos de los agregadores de delivery (Rappi, Pedidos Ya, Justo, Uber Eats)."
         badges={["Rappi conectado", "Multi-empresa"]}
       />
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-        <Link
-          href="/dashboard"
-          className="inline-block rounded bg-[#eda100] px-5 py-2.5 text-sm font-medium text-black transition-colors hover:bg-[#c98500]"
-        >
-          Ver dashboard
-        </Link>
-        <Link
-          href="/importar"
-          className="inline-block rounded border border-zinc-300 px-5 py-2.5 text-sm font-medium text-zinc-700 dark:border-zinc-700 dark:text-zinc-300"
-        >
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
+        <LinkButton3D href="/dashboard">Ver dashboard</LinkButton3D>
+        <LinkButton3D href="/importar" variant="secondary">
           Subir Excel de Rappi
-        </Link>
+        </LinkButton3D>
       </div>
     </div>
   );
