@@ -224,7 +224,7 @@ export default function ImportarPage() {
             </thead>
             <tbody>
               {imports.map((imp) => (
-                <tr key={imp.id} className="border-b border-zinc-100 dark:border-zinc-900">
+                <tr key={imp.id} className="row-hover border-b border-zinc-100 dark:border-zinc-900">
                   <td className="py-2 pr-2">{imp.platforms?.name ?? "-"}</td>
                   <td className="max-w-[180px] truncate py-2 pr-2" title={imp.file_name}>
                     {imp.file_name}

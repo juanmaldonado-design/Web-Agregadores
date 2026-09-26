@@ -3,6 +3,9 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Rojo de marca Tarragona (empresa para la que se hizo este panel) */
+  --tarragona-red: #e4002b;
+  --tarragona-red-dark: #8f0019;
 }
 
 @theme inline {
@@ -107,22 +110,22 @@ body {
 
 .btn-3d.btn-3d-primary {
   box-shadow:
-    0 5px 0 0 var(--btn-3d-shadow, #a8720a),
-    0 8px 18px -4px rgba(237, 161, 0, 0.5);
+    0 5px 0 0 var(--btn-3d-shadow, var(--tarragona-red-dark)),
+    0 8px 18px -4px rgba(228, 0, 43, 0.5);
 }
 
 .btn-3d.btn-3d-primary:hover {
   box-shadow:
-    0 6px 0 0 var(--btn-3d-shadow, #a8720a),
-    0 12px 22px -4px rgba(237, 161, 0, 0.6);
+    0 6px 0 0 var(--btn-3d-shadow, var(--tarragona-red-dark)),
+    0 12px 22px -4px rgba(228, 0, 43, 0.6);
   transform: translateY(-2px);
 }
 
 .btn-3d.btn-3d-primary:active {
   transform: translateY(3px);
   box-shadow:
-    0 2px 0 0 var(--btn-3d-shadow, #a8720a),
-    0 4px 10px -2px rgba(237, 161, 0, 0.45);
+    0 2px 0 0 var(--btn-3d-shadow, var(--tarragona-red-dark)),
+    0 4px 10px -2px rgba(228, 0, 43, 0.45);
 }
 
 .btn-3d-shine {
@@ -157,5 +160,59 @@ body {
   }
   .btn-3d-shine::before {
     display: none;
+  }
+}
+
+/* Texto con relieve 3D: capas de sombra tipo letras "infladas" (estilo
+   rótulo de marca), pensado para títulos grandes sobre fondo oscuro. */
+.text-3d {
+  font-family: var(--font-baloo), var(--font-sans);
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow:
+    1px 1px 0 rgba(0, 0, 0, 0.15),
+    2px 2px 0 rgba(0, 0, 0, 0.15),
+    3px 3px 0 rgba(0, 0, 0, 0.15),
+    4px 4px 8px rgba(0, 0, 0, 0.35);
+}
+
+.text-3d-accent {
+  color: var(--tarragona-red);
+  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.15);
+}
+
+/* Filas de tabla dinámicas: resalte sutil + acento rojo a la izquierda al
+   pasar el mouse. */
+.row-hover {
+  position: relative;
+  transition:
+    background-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.row-hover::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--tarragona-red);
+  transform: scaleY(0);
+  transition: transform 0.15s ease;
+}
+
+.row-hover:hover {
+  background-color: rgba(228, 0, 43, 0.05);
+}
+
+.row-hover:hover::before {
+  transform: scaleY(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row-hover,
+  .row-hover::before {
+    transition: none;
   }
 }

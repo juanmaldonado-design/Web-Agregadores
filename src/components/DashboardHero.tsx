@@ -48,10 +48,10 @@ export default function DashboardHero({
           />
         ))}
       </div>
-      {/* Resplandor cálido de fondo, sutil */}
+      {/* Resplandor cálido de fondo, sutil — rojo Tarragona */}
       <div
-        className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full opacity-20 blur-3xl"
-        style={{ background: "radial-gradient(circle, #eda100, transparent 70%)" }}
+        className="pointer-events-none absolute -top-24 -right-24 h-64 w-64 rounded-full opacity-25 blur-3xl"
+        style={{ background: "radial-gradient(circle, var(--tarragona-red), transparent 70%)" }}
       />
 
       <div className="relative flex flex-col gap-4">
@@ -69,9 +69,11 @@ export default function DashboardHero({
         )}
 
         <div>
-          {eyebrow && <p className="text-xs font-semibold tracking-wide text-[#eda100] uppercase">{eyebrow}</p>}
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            {title} {accent && <span className="font-light text-zinc-400">{accent}</span>}
+          {eyebrow && (
+            <p className="text-xs font-semibold tracking-wide text-[var(--tarragona-red)] uppercase">{eyebrow}</p>
+          )}
+          <h1 className="text-3d mt-1 text-3xl tracking-tight sm:text-4xl">
+            {title} {accent && <span className="text-3d-accent">{accent}</span>}
           </h1>
           {subtitle && <p className="mt-2 max-w-xl text-sm text-zinc-400">{subtitle}</p>}
         </div>

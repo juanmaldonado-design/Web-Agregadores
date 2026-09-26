@@ -4,9 +4,9 @@ import Link from "next/link";
 import type { ReactNode, ButtonHTMLAttributes } from "react";
 import Tilt3D from "./Tilt3D";
 
-const base = "btn-3d relative rounded-lg px-5 py-2.5 text-sm font-medium transition-colors";
+const base = "btn-3d relative rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors";
 const variants = {
-  primary: `${base} btn-3d-primary bg-[#eda100] text-black hover:bg-[#f2ac1a]`,
+  primary: `${base} btn-3d-primary bg-[var(--tarragona-red)] text-white hover:bg-[#ff1f45]`,
   secondary: `${base} border border-zinc-300 bg-white text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300`,
 };
 

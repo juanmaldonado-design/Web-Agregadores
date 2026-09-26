@@ -199,7 +199,7 @@ export default async function DashboardPage({
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className="border-b border-zinc-100 last:border-0 dark:border-zinc-900">
+              <tr key={r.id} className="row-hover border-b border-zinc-100 last:border-0 dark:border-zinc-900">
                 <td className="px-3 py-2 font-medium text-black dark:text-zinc-50">{r.companies?.name ?? "-"}</td>
                 <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">{r.tipo_local ?? "-"}</td>
                 <td className="px-3 py-2 text-right tabular-nums">{currency.format(r.monto_a_depositar)}</td>

@@ -284,7 +284,7 @@ export default function Explorer({ companies, stores }: { companies: Company[]; 
                   </thead>
                   <tbody>
                     {orders.map((o) => (
-                      <tr key={o.id} className="border-b border-zinc-100 last:border-0 dark:border-zinc-900">
+                      <tr key={o.id} className="row-hover border-b border-zinc-100 last:border-0 dark:border-zinc-900">
                         <td className="py-1.5 pr-2 tabular-nums">{formatTime(o.order_created_at)}</td>
                         <td className="py-1.5 pr-2 tabular-nums text-zinc-500">{o.external_order_id}</td>
                         <td className="py-1.5 pr-2">{o.transaction_type ?? "-"}</td>
