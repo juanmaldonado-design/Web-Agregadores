@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import DashboardHero from "@/components/DashboardHero";
+import LogoutButton from "@/components/LogoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -168,6 +169,7 @@ export default async function DashboardPage({
           <Link href="/importar" className="text-sm text-zinc-600 underline dark:text-zinc-400">
             Subir Excel
           </Link>
+          <LogoutButton />
         </div>
       </div>
 

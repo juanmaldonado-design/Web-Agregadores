@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import DashboardHero from "@/components/DashboardHero";
+import LogoutButton from "@/components/LogoutButton";
 import Explorer from "./Explorer";
 
 export const dynamic = "force-dynamic";
@@ -24,10 +25,11 @@ export default async function DetallePage() {
         badges={[`${companies?.length ?? 0} empresas`, `${stores?.length ?? 0} locales`]}
       />
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-4">
         <Link href="/dashboard" className="text-sm text-zinc-600 underline dark:text-zinc-400">
           ← Resumen ejecutivo
         </Link>
+        <LogoutButton />
       </div>
 
       <Explorer companies={companies ?? []} stores={stores ?? []} />
