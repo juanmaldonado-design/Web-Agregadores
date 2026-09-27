@@ -1,14 +1,7 @@
 // Lógica de agrupamiento jerárquico (Empresa -> Cc/Local -> Fecha -> Orden)
-// para el Data Grid de drill-down. Este módulo es puro (sin React): construye
-// el árbol de filas a partir de datos planos a nivel de orden.
-
-export interface MetricDef {
-  key: MetricKey;
-  /** Encabezado completo, tal como lo entrega Rappi (se usa como title/tooltip). */
-  label: string;
-  /** Encabezado corto que cabe en la columna. */
-  short: string;
-}
+// para el Data Grid de drill-down. Este módulo es puro (sin dependencia de
+// Supabase): construye el árbol de filas a partir de datos planos a nivel de
+// orden, ya normalizados por quien los obtiene (ver dashboard/drilldown/page.tsx).
 
 export type MetricKey =
   | "ventasBase"
@@ -26,21 +19,50 @@ export type MetricKey =
   | "reintegro35"
   | "valorNeto";
 
+// De dónde sale cada métrica: 4 de las 14 ya están normalizadas como columnas
+// numéricas propias de `orders` (parseadas al importar el Excel); el resto
+// vive únicamente en la columna `raw` (jsonb con el encabezado original de
+// Rappi como clave, valor guardado como texto).
+export type MetricSource =
+  | { kind: "column"; column: "platform_fee" | "platform_fee_tax" | "manual_adjustment" | "net_amount" }
+  | { kind: "raw"; rawKey: string };
+
+export interface MetricDef {
+  key: MetricKey;
+  /** Encabezado real de la hoja "Consolidado Semanal" (para tooltip). */
+  label: string;
+  /** Encabezado corto que cabe en la columna. */
+  short: string;
+  source: MetricSource;
+}
+
 export const METRICS: MetricDef[] = [
-  { key: "ventasBase", label: "Suma de Ventas base por Uso y alquiler de plataforma Rappi (informativo)", short: "Ventas base" },
-  { key: "mealVouchers", label: "Suma de Meal Vouchers", short: "Meal Vouchers" },
-  { key: "compensaciones", label: "Suma de Compensaciones", short: "Compensaciones" },
-  { key: "usoAlquiler", label: "Suma de Uso y alquiler de plataforma Rappi", short: "Uso y alquiler" },
-  { key: "usoAlquilerPro", label: "Suma de Uso y Alquiler de plataforma Rappi para órdenes Pro", short: "Uso y alquiler Pro" },
-  { key: "descuentoInversionDAR", label: "Suma de Descuento por inversión de Rappi a aplicar sobre Uso y alquiler de plataforma Rappi DAR", short: "Desc. inversión DAR" },
-  { key: "cuotaRappiAds", label: "Suma de Cuota de RappiAds", short: "Cuota RappiAds" },
-  { key: "ivaUsoAlquiler", label: "Suma de IVA Uso y alquiler de plataforma Rappi", short: "IVA uso y alquiler" },
-  { key: "descuentoInversionIvaDAR", label: "Suma de Descuento por inversión de Rappi a aplicar sobre el IVA Uso y alquiler de plataforma Rappi DAR", short: "Desc. inversión IVA DAR" },
-  { key: "ivaRappiAds", label: "Suma de IVA Rappi Ads", short: "IVA RappiAds" },
-  { key: "ajustesManuales", label: "Suma de Valor Ajustes Manuales", short: "Ajustes manuales" },
-  { key: "cashbackAsumido", label: "Suma de Cashback en Créditos de Rappi asumido por el aliado", short: "Cashback asumido" },
-  { key: "reintegro35", label: "Suma de Reintegro 35%", short: "Reintegro 35%" },
-  { key: "valorNeto", label: "Suma de Valor Neto", short: "Valor neto" },
+  { key: "ventasBase", label: "Ventas base por Uso y alquiler de plataforma Rappi (informativo)", short: "Ventas base", source: { kind: "raw", rawKey: "Ventas base por Uso y alquiler de plataforma Rappi (informativo)" } },
+  { key: "mealVouchers", label: "Meal Vouchers", short: "Meal Vouchers", source: { kind: "raw", rawKey: "Meal Vouchers" } },
+  { key: "compensaciones", label: "Compensaciones", short: "Compensaciones", source: { kind: "raw", rawKey: "Compensaciones" } },
+  { key: "usoAlquiler", label: "Uso y alquiler de plataforma Rappi", short: "Uso y alquiler", source: { kind: "column", column: "platform_fee" } },
+  { key: "usoAlquilerPro", label: "Uso y Alquiler de plataforma Rappi para órdenes Pro", short: "Uso y alquiler Pro", source: { kind: "raw", rawKey: "Uso y Alquiler de plataforma Rappi para órdenes Pro" } },
+  // Ojo: este encabezado trae doble espacio en el Excel original de Rappi ("Rappi  a aplicar").
+  { key: "descuentoInversionDAR", label: "Descuento por inversión de Rappi a aplicar sobre Uso y alquiler de plataforma Rappi DAR", short: "Desc. inversión DAR", source: { kind: "raw", rawKey: "Descuento por inversión de Rappi  a aplicar sobre Uso y alquiler de plataforma Rappi DAR" } },
+  { key: "cuotaRappiAds", label: "Cuota de RappiAds", short: "Cuota RappiAds", source: { kind: "raw", rawKey: "Cuota de RappiAds" } },
+  { key: "ivaUsoAlquiler", label: "IVA Uso y alquiler de plataforma Rappi", short: "IVA uso y alquiler", source: { kind: "column", column: "platform_fee_tax" } },
+  { key: "descuentoInversionIvaDAR", label: "Descuento por inversión de Rappi a aplicar sobre el IVA Uso y alquiler de plataforma Rappi DAR", short: "Desc. inversión IVA DAR", source: { kind: "raw", rawKey: "Descuento por inversión de Rappi a aplicar sobre el IVA Uso y alquiler de plataforma Rappi DAR" } },
+  { key: "ivaRappiAds", label: "IVA Rappi Ads", short: "IVA RappiAds", source: { kind: "raw", rawKey: "IVA Rappi Ads" } },
+  { key: "ajustesManuales", label: "Valor Ajustes Manuales", short: "Ajustes manuales", source: { kind: "column", column: "manual_adjustment" } },
+  { key: "cashbackAsumido", label: "Cashback en Créditos de Rappi asumido por el aliado", short: "Cashback asumido", source: { kind: "raw", rawKey: "Cashback en Créditos de Rappi asumido por el aliado" } },
+  { key: "reintegro35", label: "Reintegro 35%", short: "Reintegro 35%", source: { kind: "raw", rawKey: "Reintegro 35%" } },
+  { key: "valorNeto", label: "Valor Neto", short: "Valor neto", source: { kind: "column", column: "net_amount" } },
+];
+
+/** Columnas que se muestran por defecto (vista compacta); el resto queda un clic atrás. */
+export const DEFAULT_VISIBLE_METRICS: MetricKey[] = [
+  "ventasBase",
+  "compensaciones",
+  "usoAlquiler",
+  "ivaUsoAlquiler",
+  "ajustesManuales",
+  "cashbackAsumido",
+  "valorNeto",
 ];
 
 export type Metrics = Record<MetricKey, number>;
@@ -49,7 +71,7 @@ export interface OrderLeaf {
   empresa: string;
   cc: string;
   local: string;
-  /** Formato dd-mm-yyyy, tal como lo entrega el export de Rappi. */
+  /** Fecha ISO (yyyy-mm-dd), calculada a partir de "Fecha_Original_Rappi". */
   fecha: string;
   ordenId: string;
   metrics: Metrics;
@@ -115,11 +137,6 @@ function groupBy<T>(items: T[], keyOf: (item: T) => string): Map<string, T[]> {
   return groups;
 }
 
-export function parseFechaDDMMYYYY(fecha: string): Date {
-  const [d, m, y] = fecha.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d));
-}
-
 const fechaLongFormat = new Intl.DateTimeFormat("es-CL", {
   weekday: "short",
   day: "2-digit",
@@ -128,8 +145,9 @@ const fechaLongFormat = new Intl.DateTimeFormat("es-CL", {
   timeZone: "UTC",
 });
 
+/** `fecha` es una fecha ISO (yyyy-mm-dd); se formatea siempre en UTC. */
 export function formatFechaLong(fecha: string): string {
-  return fechaLongFormat.format(parseFechaDDMMYYYY(fecha));
+  return fechaLongFormat.format(new Date(`${fecha}T00:00:00Z`));
 }
 
 /**
@@ -140,99 +158,101 @@ export function formatFechaLong(fecha: string): string {
 export function buildHierarchy(orders: OrderLeaf[]): EmpresaRow[] {
   const byEmpresa = groupBy(orders, (o) => o.empresa);
 
-  return Array.from(byEmpresa.entries()).map(([empresa, empresaOrders]) => {
-    const byLocal = groupBy(empresaOrders, (o) => `${o.cc}\u0000${o.local}`);
+  return Array.from(byEmpresa.entries())
+    .sort(([a], [b]) => a.localeCompare(b, "es"))
+    .map(([empresa, empresaOrders]) => {
+      const byLocal = groupBy(empresaOrders, (o) => `${o.cc}\u0000${o.local}`);
 
-    const locales: LocalRow[] = Array.from(byLocal.entries()).map(([localKey, localOrders]) => {
-      const [cc, local] = localKey.split("\u0000");
-      const byFecha = groupBy(localOrders, (o) => o.fecha);
+      const locales: LocalRow[] = Array.from(byLocal.entries())
+        .map(([localKey, localOrders]) => {
+          const [cc, local] = localKey.split("\u0000");
+          const byFecha = groupBy(localOrders, (o) => o.fecha);
 
-      const fechas: FechaRow[] = Array.from(byFecha.entries())
-        .sort(([a], [b]) => parseFechaDDMMYYYY(a).getTime() - parseFechaDDMMYYYY(b).getTime())
-        .map(([fecha, fechaOrders]) => {
-          const ordenes: OrdenRow[] = fechaOrders.map((o) => ({
-            id: `orden:${o.ordenId}`,
-            level: 4,
-            ordenId: o.ordenId,
-            metrics: o.metrics,
-          }));
+          const fechas: FechaRow[] = Array.from(byFecha.entries())
+            .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+            .map(([fecha, fechaOrders]) => {
+              const ordenes: OrdenRow[] = fechaOrders
+                .slice()
+                .sort((a, b) => a.ordenId.localeCompare(b.ordenId))
+                .map((o) => ({
+                  id: `orden:${o.ordenId}`,
+                  level: 4,
+                  ordenId: o.ordenId,
+                  metrics: o.metrics,
+                }));
+
+              return {
+                id: `fecha:${empresa}:${cc}:${local}:${fecha}`,
+                level: 3,
+                fecha,
+                orderCount: fechaOrders.length,
+                metrics: sumMetrics(fechaOrders.map((o) => o.metrics)),
+                subRows: ordenes,
+              };
+            });
 
           return {
-            id: `fecha:${empresa}:${cc}:${local}:${fecha}`,
-            level: 3,
-            fecha,
-            orderCount: fechaOrders.length,
-            metrics: sumMetrics(fechaOrders.map((o) => o.metrics)),
-            subRows: ordenes,
+            id: `local:${empresa}:${cc}:${local}`,
+            level: 2 as const,
+            cc,
+            local,
+            orderCount: localOrders.length,
+            metrics: sumMetrics(localOrders.map((o) => o.metrics)),
+            subRows: fechas,
           };
-        });
+        })
+        .sort((a, b) => a.local.localeCompare(b.local, "es"));
 
       return {
-        id: `local:${empresa}:${cc}:${local}`,
-        level: 2,
-        cc,
-        local,
-        orderCount: localOrders.length,
-        metrics: sumMetrics(localOrders.map((o) => o.metrics)),
-        subRows: fechas,
+        id: `empresa:${empresa}`,
+        level: 1,
+        empresa,
+        orderCount: empresaOrders.length,
+        metrics: sumMetrics(empresaOrders.map((o) => o.metrics)),
+        subRows: locales,
       };
     });
-
-    return {
-      id: `empresa:${empresa}`,
-      level: 1,
-      empresa,
-      orderCount: empresaOrders.length,
-      metrics: sumMetrics(empresaOrders.map((o) => o.metrics)),
-      subRows: locales,
-    };
-  });
 }
 
-function parseCLPNumber(raw: string): number {
-  const trimmed = raw.trim();
-  if (trimmed === "" || trimmed === "-") return 0;
-  const negative = trimmed.startsWith("-");
-  const digits = trimmed.replace(/[^0-9]/g, "");
-  const value = digits === "" ? 0 : Number(digits);
-  return negative ? -value : value;
+/** Convierte un valor de la columna `raw` (texto plano, ej. "-2078.4", "0") a número. */
+export function parseRawMetricNumber(v: unknown): number {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  const s = String(v).trim();
+  if (s === "" || s === "-") return 0;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
 }
 
-interface RawOrderRow {
-  empresa: string;
-  cc: string;
-  local: string;
-  fecha: string;
-  ordenId: string;
-  /** Valores en el mismo orden que METRICS, tal como vienen del Excel. */
-  values: string[];
+/**
+ * "Fecha_Original_Rappi" se guarda como el texto que produce `String(new Date(...))`
+ * al importar (ej. "Wed Aug 26 2026 00:00:00 GMT+0000 (Coordinated Universal Time)").
+ * Devuelve la fecha en formato ISO (yyyy-mm-dd) en UTC, o null si no se pudo leer.
+ */
+export function parseRawDateToISO(v: unknown): string | null {
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (typeof v !== "string" || !v.trim()) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 }
 
-// Dataset de ejemplo (nivel más granular) provisto para construir el mock.
-const RAW_ORDERS: RawOrderRow[] = [
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "07-09-2026", ordenId: "118477032", values: ["10.490", "-", "-", "-1.678", "-", "-", "-", "-319", "-", "-", "-", "-", "-", "8.493"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "08-09-2026", ordenId: "118495050", values: ["5.500", "-", "-", "-1.040", "-", "840", "-", "-198", "160", "-", "-", "-", "-", "5.262"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "08-09-2026", ordenId: "118499852", values: ["14.270", "-", "-", "-2.283", "-", "-", "-", "-434", "-", "-", "-", "-", "-", "11.553"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "09-09-2026", ordenId: "118509106", values: ["12.000", "-", "-", "-2.080", "-", "840", "-", "-395", "160", "-", "-", "-", "-", "10.525"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "09-09-2026", ordenId: "118510984", values: ["6.500", "-", "-", "-1.040", "-", "-", "-", "-198", "-", "-", "-", "-", "-", "5.262"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "09-09-2026", ordenId: "118511629", values: ["3.571", "-", "-", "-1.070", "-", "2.621", "-", "-203", "498", "-", "-", "-", "-", "5.416"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "09-09-2026", ordenId: "118515648", values: ["14.990", "-", "-", "-2.398", "-", "-", "-", "-456", "-", "-", "-", "-", "-", "12.136"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "10-09-2026", ordenId: "118537101", values: ["5.500", "-", "-", "-1.040", "-", "840", "-", "-198", "160", "-", "-", "-", "-", "5.262"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "10-09-2026", ordenId: "118548954", values: ["6.980", "-", "-", "-1.117", "-", "-", "-", "-212", "-", "-", "-", "-", "-", "5.651"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "11-09-2026", ordenId: "118560676", values: ["12.000", "-", "-", "-2.080", "-", "840", "-", "-395", "160", "-", "-", "-", "-", "10.525"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "11-09-2026", ordenId: "118565985", values: ["11.990", "-", "-", "-1.918", "-", "-", "-", "-364", "-", "-", "-", "-", "-", "9.707"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "11-09-2026", ordenId: "118566774", values: ["5.500", "-", "-", "-1.040", "-", "840", "-", "-198", "160", "-", "-", "-", "-", "5.262"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "11-09-2026", ordenId: "118568258", values: ["14.990", "-", "-", "-2.398", "-", "-", "-", "-456", "-", "-", "-", "-", "-", "12.136"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "11-09-2026", ordenId: "118570506", values: ["5.500", "-", "-", "-1.040", "-", "840", "-", "-198", "160", "-", "-", "-", "-", "5.262"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "11-09-2026", ordenId: "118578459", values: ["1.766", "-", "-", "-1.040", "-", "3.978", "-", "-198", "756", "-", "-", "-", "-", "5.262"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "12-09-2026", ordenId: "118595262", values: ["5.500", "-", "-", "-1.040", "-", "840", "-", "-198", "160", "-", "-", "-", "-", "5.262"] },
-  { empresa: "COMERCIAL TARRAGONA S.A.", cc: "L052", local: "12 Oriente Talca", fecha: "13-09-2026", ordenId: "118628915", values: ["5.500", "-", "-", "-1.040", "-", "840", "-", "-198", "160", "-", "-", "-", "-", "5.262"] },
-];
+interface OrderRecordForMetrics {
+  platform_fee: number | string | null;
+  platform_fee_tax: number | string | null;
+  manual_adjustment: number | string | null;
+  net_amount: number | string | null;
+  raw: Record<string, unknown> | null;
+}
 
-export const mockOrders: OrderLeaf[] = RAW_ORDERS.map((row) => {
+/** Arma el registro de métricas de una orden combinando columnas tipadas + `raw`. */
+export function extractMetrics(row: OrderRecordForMetrics): Metrics {
   const metrics = emptyMetrics();
-  METRICS.forEach((def, i) => {
-    metrics[def.key] = parseCLPNumber(row.values[i]);
-  });
-  return { empresa: row.empresa, cc: row.cc, local: row.local, fecha: row.fecha, ordenId: row.ordenId, metrics };
-});
+  for (const def of METRICS) {
+    if (def.source.kind === "column") {
+      metrics[def.key] = parseRawMetricNumber(row[def.source.column]);
+    } else {
+      metrics[def.key] = parseRawMetricNumber(row.raw?.[def.source.rawKey]);
+    }
+  }
+  return metrics;
+}

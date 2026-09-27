@@ -6,9 +6,11 @@ import Dropdown from "./Dropdown";
 export default function PeriodSelector({
   periods,
   selectedKey,
+  basePath = "/dashboard",
 }: {
   periods: { period_start: string; period_end: string }[];
   selectedKey: string;
+  basePath?: string;
 }) {
   const router = useRouter();
 
@@ -21,7 +23,7 @@ export default function PeriodSelector({
     <Dropdown
       value={selectedKey}
       options={options}
-      onChange={(v) => router.push(`/dashboard?period=${v}`)}
+      onChange={(v) => router.push(`${basePath}?period=${v}`)}
       className="min-w-[220px]"
     />
   );
