@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Dropdown from "@/components/Dropdown";
 
 interface Company {
   id: number;
@@ -126,41 +127,32 @@ export default function Explorer({ companies, stores }: { companies: Company[]; 
   return (
     <div className="flex flex-col gap-6">
       {/* Filtros */}
-      <div className="flex flex-wrap gap-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="card-elevated flex flex-wrap gap-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-zinc-700 dark:text-zinc-300">Empresa</span>
-          <select
-            value={companyId}
-            onChange={(e) => {
-              const v = e.target.value;
+          <Dropdown
+            value={String(companyId)}
+            options={[
+              { value: "all", label: "Todas las empresas" },
+              ...companies.map((c) => ({ value: String(c.id), label: c.name })),
+            ]}
+            onChange={(v) => {
               setCompanyId(v === "all" ? "all" : Number(v));
               setStoreId("");
             }}
-            className="min-w-[200px] rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm transition-colors focus:border-[#2a78d6] focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
-          >
-            <option value="all">Todas las empresas</option>
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            className="min-w-[200px]"
+          />
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-zinc-700 dark:text-zinc-300">Local</span>
-          <select
+          <Dropdown
             value={storeId}
-            onChange={(e) => setStoreId(e.target.value)}
-            className="min-w-[240px] rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm transition-colors focus:border-[#2a78d6] focus:outline-none dark:border-zinc-700 dark:bg-zinc-900"
-          >
-            <option value="">Selecciona un local…</option>
-            {filteredStores.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.local_name || s.name}
-              </option>
-            ))}
-          </select>
+            options={filteredStores.map((s) => ({ value: s.id, label: s.local_name || s.name }))}
+            onChange={setStoreId}
+            placeholder="Selecciona un local…"
+            className="min-w-[240px]"
+          />
         </label>
       </div>
 
@@ -196,7 +188,7 @@ export default function Explorer({ companies, stores }: { companies: Company[]; 
       )}
 
       {storeId && !loadingDays && days && days.length > 0 && (
-        <div className="animate-fade-in-up flex flex-col gap-4 rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="card-elevated animate-fade-in-up flex flex-col gap-4 rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="font-semibold text-black dark:text-zinc-50">
               {selectedStore?.local_name || selectedStore?.name}
@@ -208,7 +200,7 @@ export default function Explorer({ companies, stores }: { companies: Company[]; 
           </div>
 
           <div className="overflow-x-auto">
-            <div className="flex h-56 min-w-full items-end gap-1.5 pb-1" style={{ minWidth: `${days.length * 28}px` }}>
+            <div className="flex h-56 min-w-full gap-1.5 pb-1" style={{ minWidth: `${days.length * 28}px` }}>
               {days.map((d) => {
                 const heightPct = grown ? Math.max((d.grossSales / maxGross) * 100, 3) : 0;
                 return (
@@ -245,7 +237,7 @@ export default function Explorer({ companies, stores }: { companies: Company[]; 
           onClick={() => setSelectedDate(null)}
         >
           <div
-            className="animate-scale-in flex max-h-[85vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-xl dark:bg-zinc-950"
+            className="card-elevated animate-scale-in flex max-h-[85vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-xl dark:bg-zinc-950"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-zinc-200 p-4 dark:border-zinc-800">

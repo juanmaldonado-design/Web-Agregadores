@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button3D } from "@/components/Button3D";
+import FileDropzone from "@/components/FileDropzone";
 
 type FileStatus = "pending" | "loading" | "success" | "error";
 
@@ -128,25 +129,7 @@ export default function ImportarPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            Archivos Excel (.xlsx) — puedes seleccionar varios
-            <input
-              type="file"
-              accept=".xlsx"
-              multiple
-              required
-              onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-              className="rounded border border-zinc-300 p-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-black file:px-3 file:py-1.5 file:text-sm file:text-white dark:border-zinc-700 dark:file:bg-zinc-50 dark:file:text-black"
-            />
-          </label>
-
-          {files.length > 0 && (
-            <ul className="text-sm text-zinc-600 dark:text-zinc-400">
-              {files.map((f) => (
-                <li key={f.name}>• {f.name}</li>
-              ))}
-            </ul>
-          )}
+          <FileDropzone files={files} onFilesChange={setFiles} />
 
           <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Clave de acceso
@@ -194,14 +177,15 @@ export default function ImportarPage() {
       <div className="flex flex-col gap-4 border-t border-zinc-200 pt-8 dark:border-zinc-800">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-black dark:text-zinc-50">Cargas anteriores</h2>
-          <button
+          <Button3D
             type="button"
+            variant="secondary"
             onClick={loadImports}
             disabled={!secret}
-            className="rounded border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300"
+            className="!px-3 !py-1.5 disabled:opacity-50"
           >
             {imports ? "Actualizar" : "Ver cargas"}
-          </button>
+          </Button3D>
         </div>
 
         {!secret && <p className="text-sm text-zinc-500">Escribe la clave de acceso arriba para ver el listado.</p>}
@@ -212,43 +196,45 @@ export default function ImportarPage() {
         )}
 
         {imports && imports.length > 0 && (
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-zinc-200 text-zinc-500 dark:border-zinc-800">
-                <th className="py-2 pr-2 font-medium">Plataforma</th>
-                <th className="py-2 pr-2 font-medium">Archivo</th>
-                <th className="py-2 pr-2 font-medium">Semana</th>
-                <th className="py-2 pr-2 font-medium">Subido</th>
-                <th className="py-2 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {imports.map((imp) => (
-                <tr key={imp.id} className="row-hover border-b border-zinc-100 dark:border-zinc-900">
-                  <td className="py-2 pr-2">{imp.platforms?.name ?? "-"}</td>
-                  <td className="max-w-[180px] truncate py-2 pr-2" title={imp.file_name}>
-                    {imp.file_name}
-                  </td>
-                  <td className="py-2 pr-2 whitespace-nowrap">
-                    {imp.period_start} → {imp.period_end}
-                  </td>
-                  <td className="py-2 pr-2 whitespace-nowrap text-zinc-500">
-                    {new Date(imp.imported_at).toLocaleString("es-CL")}
-                  </td>
-                  <td className="py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(imp.id, `${imp.platforms?.name ?? ""} ${imp.period_start} → ${imp.period_end}`)}
-                      disabled={deletingId === imp.id}
-                      className="text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
-                    >
-                      {deletingId === imp.id ? "Borrando..." : "Borrar"}
-                    </button>
-                  </td>
+          <div className="card-elevated overflow-x-auto rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-zinc-200 text-zinc-500 dark:border-zinc-800">
+                  <th className="py-2 pr-2 font-medium">Plataforma</th>
+                  <th className="py-2 pr-2 font-medium">Archivo</th>
+                  <th className="py-2 pr-2 font-medium">Semana</th>
+                  <th className="py-2 pr-2 font-medium">Subido</th>
+                  <th className="py-2 font-medium" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {imports.map((imp) => (
+                  <tr key={imp.id} className="row-hover border-b border-zinc-100 dark:border-zinc-900">
+                    <td className="py-2 pr-2">{imp.platforms?.name ?? "-"}</td>
+                    <td className="max-w-[180px] truncate py-2 pr-2" title={imp.file_name}>
+                      {imp.file_name}
+                    </td>
+                    <td className="py-2 pr-2 whitespace-nowrap">
+                      {imp.period_start} → {imp.period_end}
+                    </td>
+                    <td className="py-2 pr-2 whitespace-nowrap text-zinc-500">
+                      {new Date(imp.imported_at).toLocaleString("es-CL")}
+                    </td>
+                    <td className="py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(imp.id, `${imp.platforms?.name ?? ""} ${imp.period_start} → ${imp.period_end}`)}
+                        disabled={deletingId === imp.id}
+                        className="text-red-600 hover:underline disabled:opacity-50 dark:text-red-400"
+                      >
+                        {deletingId === imp.id ? "Borrando..." : "Borrar"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
