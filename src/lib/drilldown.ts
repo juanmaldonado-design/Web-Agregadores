@@ -2,41 +2,46 @@
 // para el Data Grid de drill-down. Este módulo es puro (sin dependencia de
 // Supabase): construye el árbol de filas a partir de datos planos a nivel de
 // orden, ya normalizados por quien los obtiene (ver dashboard/drilldown/page.tsx).
+//
+// Cada agregador (Rappi, Pedidos Ya, Justo, Uber Eats) trae sus propias
+// columnas de comisión/descuento en su Excel, así que las métricas NO son
+// una lista fija: son una configuración por plataforma (ver PLATFORM_METRICS
+// más abajo). Todo lo demás en este archivo (el árbol de 4 niveles, el
+// agrupamiento, el formateo de fechas) es genérico y sirve para cualquier
+// plataforma sin cambios.
 
-export type MetricKey =
-  | "ventasBase"
-  | "mealVouchers"
-  | "compensaciones"
-  | "usoAlquiler"
-  | "usoAlquilerPro"
-  | "descuentoInversionDAR"
-  | "cuotaRappiAds"
-  | "ivaUsoAlquiler"
-  | "descuentoInversionIvaDAR"
-  | "ivaRappiAds"
-  | "ajustesManuales"
-  | "cashbackAsumido"
-  | "reintegro35"
-  | "valorNeto";
+// Las claves de métrica son específicas de cada plataforma (ej. Rappi usa
+// "cuotaRappiAds"; otra plataforma tendrá las suyas), así que se tratan como
+// string simple en vez de una unión fija de literales.
+export type MetricKey = string;
 
-// De dónde sale cada métrica: 4 de las 14 ya están normalizadas como columnas
-// numéricas propias de `orders` (parseadas al importar el Excel); el resto
-// vive únicamente en la columna `raw` (jsonb con el encabezado original de
-// Rappi como clave, valor guardado como texto).
+// De dónde sale cada métrica: puede ser una de las columnas numéricas
+// comunes de `orders` (gross_sales, platform_fee, etc. — el "mínimo común"
+// que se espera parsear de cualquier agregador al importar su Excel), o
+// vivir solo en la columna `raw` (jsonb con el encabezado original de esa
+// plataforma como clave, valor guardado como texto).
 export type MetricSource =
   | { kind: "column"; column: "platform_fee" | "platform_fee_tax" | "manual_adjustment" | "net_amount" }
   | { kind: "raw"; rawKey: string };
 
 export interface MetricDef {
   key: MetricKey;
-  /** Encabezado real de la hoja "Consolidado Semanal" (para tooltip). */
+  /** Encabezado real de la hoja de origen (para tooltip). */
   label: string;
   /** Encabezado corto que cabe en la columna. */
   short: string;
   source: MetricSource;
+  /** Resalta esta columna en el grid (ej. el total neto de la plataforma). */
+  emphasize?: boolean;
 }
 
-export const METRICS: MetricDef[] = [
+export interface PlatformMetricsConfig {
+  metrics: MetricDef[];
+  /** Columnas que se muestran por defecto (vista compacta); el resto queda un clic atrás. */
+  defaultVisible: MetricKey[];
+}
+
+const RAPPI_METRICS: MetricDef[] = [
   { key: "ventasBase", label: "Ventas base por Uso y alquiler de plataforma Rappi (informativo)", short: "Ventas base", source: { kind: "raw", rawKey: "Ventas base por Uso y alquiler de plataforma Rappi (informativo)" } },
   { key: "mealVouchers", label: "Meal Vouchers", short: "Meal Vouchers", source: { kind: "raw", rawKey: "Meal Vouchers" } },
   { key: "compensaciones", label: "Compensaciones", short: "Compensaciones", source: { kind: "raw", rawKey: "Compensaciones" } },
@@ -51,11 +56,10 @@ export const METRICS: MetricDef[] = [
   { key: "ajustesManuales", label: "Valor Ajustes Manuales", short: "Ajustes manuales", source: { kind: "column", column: "manual_adjustment" } },
   { key: "cashbackAsumido", label: "Cashback en Créditos de Rappi asumido por el aliado", short: "Cashback asumido", source: { kind: "raw", rawKey: "Cashback en Créditos de Rappi asumido por el aliado" } },
   { key: "reintegro35", label: "Reintegro 35%", short: "Reintegro 35%", source: { kind: "raw", rawKey: "Reintegro 35%" } },
-  { key: "valorNeto", label: "Valor Neto", short: "Valor neto", source: { kind: "column", column: "net_amount" } },
+  { key: "valorNeto", label: "Valor Neto", short: "Valor neto", source: { kind: "column", column: "net_amount" }, emphasize: true },
 ];
 
-/** Columnas que se muestran por defecto (vista compacta); el resto queda un clic atrás. */
-export const DEFAULT_VISIBLE_METRICS: MetricKey[] = [
+const RAPPI_DEFAULT_VISIBLE: MetricKey[] = [
   "ventasBase",
   "compensaciones",
   "usoAlquiler",
@@ -65,13 +69,27 @@ export const DEFAULT_VISIBLE_METRICS: MetricKey[] = [
   "valorNeto",
 ];
 
+/**
+ * Registro de métricas por plataforma (slug de la tabla `platforms`). Cuando
+ * se suba el primer Excel de Pedidos Ya/Justo/Uber Eats, se agrega su propia
+ * entrada acá (con sus propios encabezados) — el resto de este archivo, el
+ * grid y la página de desglose no necesitan cambiar.
+ */
+export const PLATFORM_METRICS: Record<string, PlatformMetricsConfig> = {
+  rappi: { metrics: RAPPI_METRICS, defaultVisible: RAPPI_DEFAULT_VISIBLE },
+};
+
+export function getPlatformMetrics(slug: string): PlatformMetricsConfig | null {
+  return PLATFORM_METRICS[slug] ?? null;
+}
+
 export type Metrics = Record<MetricKey, number>;
 
 export interface OrderLeaf {
   empresa: string;
   cc: string;
   local: string;
-  /** Fecha ISO (yyyy-mm-dd), calculada a partir de "Fecha_Original_Rappi". */
+  /** Fecha ISO (yyyy-mm-dd) de la orden, según la plataforma de origen. */
   fecha: string;
   ordenId: string;
   metrics: Metrics;
@@ -112,16 +130,16 @@ export interface OrdenRow extends BaseRow {
 
 export type HierarchyRow = EmpresaRow | LocalRow | FechaRow | OrdenRow;
 
-function emptyMetrics(): Metrics {
-  const m = {} as Metrics;
-  for (const def of METRICS) m[def.key] = 0;
+function emptyMetrics(metricDefs: MetricDef[]): Metrics {
+  const m: Metrics = {};
+  for (const def of metricDefs) m[def.key] = 0;
   return m;
 }
 
-function sumMetrics(list: Metrics[]): Metrics {
-  const total = emptyMetrics();
+function sumMetrics(list: Metrics[], metricDefs: MetricDef[]): Metrics {
+  const total = emptyMetrics(metricDefs);
   for (const metrics of list) {
-    for (const def of METRICS) total[def.key] += metrics[def.key];
+    for (const def of metricDefs) total[def.key] += metrics[def.key] ?? 0;
   }
   return total;
 }
@@ -154,8 +172,11 @@ export function formatFechaLong(fecha: string): string {
  * Construye el árbol de 4 niveles a partir de órdenes planas.
  * Niveles 1-3 llevan la suma de cada métrica; el nivel 4 (hoja) lleva el
  * valor exacto de esa orden — no se agrega, así que no requiere lógica extra.
+ * `metricDefs` es la lista de métricas de la plataforma de esas órdenes
+ * (ver PLATFORM_METRICS) — define qué claves tiene el objeto `metrics` de
+ * cada fila agregada.
  */
-export function buildHierarchy(orders: OrderLeaf[]): EmpresaRow[] {
+export function buildHierarchy(orders: OrderLeaf[], metricDefs: MetricDef[]): EmpresaRow[] {
   const byEmpresa = groupBy(orders, (o) => o.empresa);
 
   return Array.from(byEmpresa.entries())
@@ -186,7 +207,7 @@ export function buildHierarchy(orders: OrderLeaf[]): EmpresaRow[] {
                 level: 3,
                 fecha,
                 orderCount: fechaOrders.length,
-                metrics: sumMetrics(fechaOrders.map((o) => o.metrics)),
+                metrics: sumMetrics(fechaOrders.map((o) => o.metrics), metricDefs),
                 subRows: ordenes,
               };
             });
@@ -197,7 +218,7 @@ export function buildHierarchy(orders: OrderLeaf[]): EmpresaRow[] {
             cc,
             local,
             orderCount: localOrders.length,
-            metrics: sumMetrics(localOrders.map((o) => o.metrics)),
+            metrics: sumMetrics(localOrders.map((o) => o.metrics), metricDefs),
             subRows: fechas,
           };
         })
@@ -208,7 +229,7 @@ export function buildHierarchy(orders: OrderLeaf[]): EmpresaRow[] {
         level: 1,
         empresa,
         orderCount: empresaOrders.length,
-        metrics: sumMetrics(empresaOrders.map((o) => o.metrics)),
+        metrics: sumMetrics(empresaOrders.map((o) => o.metrics), metricDefs),
         subRows: locales,
       };
     });
@@ -225,9 +246,11 @@ export function parseRawMetricNumber(v: unknown): number {
 }
 
 /**
- * "Fecha_Original_Rappi" se guarda como el texto que produce `String(new Date(...))`
- * al importar (ej. "Wed Aug 26 2026 00:00:00 GMT+0000 (Coordinated Universal Time)").
- * Devuelve la fecha en formato ISO (yyyy-mm-dd) en UTC, o null si no se pudo leer.
+ * Convierte una fecha guardada en `raw` al formato ISO (yyyy-mm-dd) en UTC.
+ * Si el importador la guardó como el texto que produce `String(new Date(...))`
+ * (ej. "Wed Aug 26 2026 00:00:00 GMT+0000 (Coordinated Universal Time)",
+ * como hace Rappi con "Fecha_Original_Rappi"), `new Date(...)` la reconoce
+ * directamente. Devuelve null si no se pudo leer.
  */
 export function parseRawDateToISO(v: unknown): string | null {
   if (v instanceof Date) return v.toISOString().slice(0, 10);
@@ -245,9 +268,9 @@ interface OrderRecordForMetrics {
 }
 
 /** Arma el registro de métricas de una orden combinando columnas tipadas + `raw`. */
-export function extractMetrics(row: OrderRecordForMetrics): Metrics {
-  const metrics = emptyMetrics();
-  for (const def of METRICS) {
+export function extractMetrics(row: OrderRecordForMetrics, metricDefs: MetricDef[]): Metrics {
+  const metrics = emptyMetrics(metricDefs);
+  for (const def of metricDefs) {
     if (def.source.kind === "column") {
       metrics[def.key] = parseRawMetricNumber(row[def.source.column]);
     } else {

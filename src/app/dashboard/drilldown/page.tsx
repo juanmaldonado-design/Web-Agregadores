@@ -3,8 +3,9 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import DashboardHero from "@/components/DashboardHero";
 import LogoutButton from "@/components/LogoutButton";
 import DateRangeSelector from "@/components/DateRangeSelector";
+import PlatformSelector from "@/components/PlatformSelector";
 import DrilldownGrid from "@/components/DrilldownGrid";
-import { buildHierarchy, extractMetrics, formatFechaLong, parseRawDateToISO, type OrderLeaf } from "@/lib/drilldown";
+import { buildHierarchy, extractMetrics, formatFechaLong, getPlatformMetrics, parseRawDateToISO, type OrderLeaf } from "@/lib/drilldown";
 
 export const dynamic = "force-dynamic";
 
@@ -31,27 +32,81 @@ function addDaysIso(iso: string, days: number): string {
 export default async function DrilldownPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>;
+  searchParams: Promise<{ platform?: string; from?: string; to?: string }>;
 }) {
-  const { from: fromParam, to: toParam } = await searchParams;
+  const { platform: platformParam, from: fromParam, to: toParam } = await searchParams;
 
-  const { data: platform } = await supabaseAdmin.from("platforms").select("id").eq("slug", "rappi").single();
+  const { data: allPlatforms } = await supabaseAdmin.from("platforms").select("id, slug, name").order("id");
 
-  if (!platform) {
-    return <EmptyState reason="No se encontró la plataforma Rappi en la base de datos." />;
+  if (!allPlatforms || allPlatforms.length === 0) {
+    return <EmptyState reason="No hay agregadores configurados en la base de datos." />;
+  }
+
+  const selectedPlatform = allPlatforms.find((p) => p.slug === platformParam) ?? allPlatforms[0];
+  const metricsConfig = getPlatformMetrics(selectedPlatform.slug);
+
+  const header = (
+    <>
+      <DashboardHero
+        eyebrow="Agregadores de delivery"
+        title="Desglose"
+        accent="jerárquico"
+        subtitle={`${selectedPlatform.name}: Empresa → Cc / Local → Fecha → Orden.`}
+        badges={allPlatforms.map((p) => p.name)}
+      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PlatformSelector platforms={allPlatforms} selectedSlug={selectedPlatform.slug} basePath="/dashboard/drilldown" />
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard"
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-[var(--tarragona-red)] dark:text-zinc-400 dark:hover:bg-zinc-900"
+          >
+            ← Resumen ejecutivo
+          </Link>
+          <LogoutButton />
+        </div>
+      </div>
+    </>
+  );
+
+  // Todavía no tenemos el Excel de esta plataforma para saber qué columnas
+  // trae, así que no hay cómo armar sus métricas — en vez de adivinar,
+  // mostramos esto hasta que se cargue su primer archivo y se agregue su
+  // entrada en PLATFORM_METRICS (src/lib/drilldown.ts).
+  if (!metricsConfig) {
+    return (
+      <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-10 font-sans">
+        {header}
+        <div className="rounded-lg border border-dashed border-zinc-300 p-12 text-center text-sm text-zinc-500 dark:border-zinc-700">
+          Todavía no conectamos los datos de {selectedPlatform.name}. Cuando subamos su primer Excel, el desglose
+          jerárquico queda disponible acá mismo.
+        </div>
+      </div>
+    );
   }
 
   const { data: latestOrder } = await supabaseAdmin
     .from("orders")
     .select("order_created_at")
-    .eq("platform_id", platform.id)
+    .eq("platform_id", selectedPlatform.id)
     .not("order_created_at", "is", null)
     .order("order_created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (!latestOrder?.order_created_at) {
-    return <EmptyState reason="Todavía no se ha subido ningún Excel. Sube uno en /importar." />;
+    return (
+      <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-6 py-10 font-sans">
+        {header}
+        <div className="rounded-lg border border-dashed border-zinc-300 p-12 text-center text-sm text-zinc-500 dark:border-zinc-700">
+          Todavía no se ha subido ningún Excel de {selectedPlatform.name}.{" "}
+          <Link href="/importar" className="text-[var(--tarragona-red)] underline">
+            Sube uno en /importar
+          </Link>
+          .
+        </div>
+      </div>
+    );
   }
 
   const maxDate = latestOrder.order_created_at.slice(0, 10);
@@ -74,7 +129,7 @@ export default async function DrilldownPage({
       .select(
         "external_order_id, order_created_at, platform_fee, platform_fee_tax, manual_adjustment, net_amount, raw, companies(name), stores(local_name, cost_center)"
       )
-      .eq("platform_id", platform.id)
+      .eq("platform_id", selectedPlatform.id)
       .gte("order_created_at", `${from}T00:00:00Z`)
       .lt("order_created_at", `${toExclusive}T00:00:00Z`)
       .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
@@ -95,11 +150,11 @@ export default async function DrilldownPage({
       local: row.stores?.local_name ?? "(Sin local asignado)",
       fecha,
       ordenId: row.external_order_id,
-      metrics: extractMetrics(row),
+      metrics: extractMetrics(row, metricsConfig.metrics),
     };
   });
 
-  const data = buildHierarchy(leaves);
+  const data = buildHierarchy(leaves, metricsConfig.metrics);
   const companyCount = data.length;
   const totalOrders = data.reduce((acc, empresa) => acc + empresa.orderCount, 0);
 
@@ -109,12 +164,20 @@ export default async function DrilldownPage({
         eyebrow="Agregadores de delivery"
         title="Desglose"
         accent="jerárquico"
-        subtitle={`Empresa → Cc / Local → Fecha → Orden, del ${formatFechaLong(from)} al ${formatFechaLong(to)}.`}
+        subtitle={`${selectedPlatform.name}: Empresa → Cc / Local → Fecha → Orden, del ${formatFechaLong(from)} al ${formatFechaLong(to)}.`}
         badges={[`${companyCount} empresas`, `${totalOrders} pedidos`]}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <DateRangeSelector from={from} to={to} basePath="/dashboard/drilldown" />
+        <div className="flex flex-wrap items-end gap-2">
+          <PlatformSelector
+            platforms={allPlatforms}
+            selectedSlug={selectedPlatform.slug}
+            basePath="/dashboard/drilldown"
+            extraParams={{ from, to }}
+          />
+          <DateRangeSelector from={from} to={to} basePath="/dashboard/drilldown" />
+        </div>
         <div className="flex items-center gap-2">
           <Link
             href="/dashboard"
@@ -131,7 +194,7 @@ export default async function DrilldownPage({
           No hay pedidos en ese rango de fechas.
         </div>
       ) : (
-        <DrilldownGrid data={data} />
+        <DrilldownGrid data={data} metrics={metricsConfig.metrics} defaultVisible={metricsConfig.defaultVisible} />
       )}
     </div>
   );

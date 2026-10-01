@@ -12,7 +12,7 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table";
 import { Button3D } from "@/components/Button3D";
-import { DEFAULT_VISIBLE_METRICS, METRICS, formatFechaLong, type EmpresaRow, type HierarchyRow } from "@/lib/drilldown";
+import { formatFechaLong, type EmpresaRow, type HierarchyRow, type MetricDef, type MetricKey } from "@/lib/drilldown";
 
 const currency = new Intl.NumberFormat("es-CL", {
   style: "currency",
@@ -22,20 +22,22 @@ const currency = new Intl.NumberFormat("es-CL", {
 
 const columnHelper = createColumnHelper<HierarchyRow>();
 
-const columns = [
-  columnHelper.display({
-    id: "jerarquia",
-    header: "Empresa / Cc · Local / Fecha / Orden",
-    cell: ({ row }) => <RowLabelCell row={row} />,
-  }),
-  ...METRICS.map((metric) =>
-    columnHelper.accessor((row) => row.metrics[metric.key], {
-      id: metric.key,
-      header: () => <span title={metric.label}>{metric.short}</span>,
-      cell: (info) => <MoneyCell value={info.getValue()} strong={metric.key === "valorNeto"} />,
-    })
-  ),
-];
+function buildColumns(metrics: MetricDef[]) {
+  return [
+    columnHelper.display({
+      id: "jerarquia",
+      header: "Empresa / Cc · Local / Fecha / Orden",
+      cell: ({ row }) => <RowLabelCell row={row} />,
+    }),
+    ...metrics.map((metric) =>
+      columnHelper.accessor((row) => row.metrics[metric.key], {
+        id: metric.key,
+        header: () => <span title={metric.label}>{metric.short}</span>,
+        cell: (info) => <MoneyCell value={info.getValue()} strong={metric.emphasize} />,
+      })
+    ),
+  ];
+}
 
 function MoneyCell({ value, strong }: { value: number; strong?: boolean }) {
   if (value === 0) {
@@ -148,18 +150,29 @@ function GridRow({ row }: { row: Row<HierarchyRow> }) {
   );
 }
 
-export default function DrilldownGrid({ data }: { data: EmpresaRow[] }) {
+export default function DrilldownGrid({
+  data,
+  metrics,
+  defaultVisible,
+}: {
+  data: EmpresaRow[];
+  /** Métricas de la plataforma de `data` (ver PLATFORM_METRICS en @/lib/drilldown). */
+  metrics: MetricDef[];
+  defaultVisible: MetricKey[];
+}) {
   const [expanded, setExpanded] = useState<ExpandedState>({});
   const [compact, setCompact] = useState(true);
+
+  const columns = useMemo(() => buildColumns(metrics), [metrics]);
 
   const columnVisibility = useMemo<VisibilityState>(() => {
     if (!compact) return {};
     const visibility: VisibilityState = {};
-    for (const metric of METRICS) {
-      if (!DEFAULT_VISIBLE_METRICS.includes(metric.key)) visibility[metric.key] = false;
+    for (const metric of metrics) {
+      if (!defaultVisible.includes(metric.key)) visibility[metric.key] = false;
     }
     return visibility;
-  }, [compact]);
+  }, [compact, metrics, defaultVisible]);
 
   const table = useReactTable({
     data,
