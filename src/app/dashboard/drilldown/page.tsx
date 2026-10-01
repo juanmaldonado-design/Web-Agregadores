@@ -2,11 +2,13 @@ import Link from "next/link";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import DashboardHero from "@/components/DashboardHero";
 import LogoutButton from "@/components/LogoutButton";
-import PeriodSelector from "@/components/PeriodSelector";
+import DateRangeSelector from "@/components/DateRangeSelector";
 import DrilldownGrid from "@/components/DrilldownGrid";
-import { buildHierarchy, extractMetrics, parseRawDateToISO, type OrderLeaf } from "@/lib/drilldown";
+import { buildHierarchy, extractMetrics, formatFechaLong, parseRawDateToISO, type OrderLeaf } from "@/lib/drilldown";
 
 export const dynamic = "force-dynamic";
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 interface OrderQueryRow {
   external_order_id: string;
@@ -20,12 +22,18 @@ interface OrderQueryRow {
   stores: { local_name: string | null; cost_center: string | null } | null;
 }
 
+function addDaysIso(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 export default async function DrilldownPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ from?: string; to?: string }>;
 }) {
-  const { period: periodParam } = await searchParams;
+  const { from: fromParam, to: toParam } = await searchParams;
 
   const { data: platform } = await supabaseAdmin.from("platforms").select("id").eq("slug", "rappi").single();
 
@@ -33,69 +41,65 @@ export default async function DrilldownPage({
     return <EmptyState reason="No se encontró la plataforma Rappi en la base de datos." />;
   }
 
-  const { data: importRows } = await supabaseAdmin
-    .from("imports")
-    .select("period_start, period_end")
+  const { data: latestOrder } = await supabaseAdmin
+    .from("orders")
+    .select("order_created_at")
     .eq("platform_id", platform.id)
-    .order("period_start", { ascending: false });
+    .not("order_created_at", "is", null)
+    .order("order_created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  const periods = Array.from(
-    new Map((importRows ?? []).map((p) => [`${p.period_start}_${p.period_end}`, p])).values()
-  );
-
-  if (periods.length === 0) {
+  if (!latestOrder?.order_created_at) {
     return <EmptyState reason="Todavía no se ha subido ningún Excel. Sube uno en /importar." />;
   }
 
-  const selected = periods.find((p) => `${p.period_start}_${p.period_end}` === periodParam) ?? periods[0];
+  const maxDate = latestOrder.order_created_at.slice(0, 10);
+  const defaultFrom = addDaysIso(maxDate, -6);
 
-  const { data: importRow } = await supabaseAdmin
-    .from("imports")
-    .select("id")
-    .eq("platform_id", platform.id)
-    .eq("period_start", selected.period_start)
-    .eq("period_end", selected.period_end)
-    .single();
+  let from = fromParam && ISO_DATE_RE.test(fromParam) ? fromParam : defaultFrom;
+  let to = toParam && ISO_DATE_RE.test(toParam) ? toParam : maxDate;
+  if (from > to) [from, to] = [to, from];
 
-  let data: ReturnType<typeof buildHierarchy> = [];
-
-  if (importRow) {
-    // Supabase limita cada consulta a ~1000 filas (max-rows de PostgREST) y
-    // algunas semanas superan eso, así que se pagina hasta agotar los datos.
-    const PAGE_SIZE = 1000;
-    const rows: OrderQueryRow[] = [];
-    for (let page = 0; ; page++) {
-      const { data: pageRows, error } = await supabaseAdmin
-        .from("orders")
-        .select(
-          "external_order_id, order_created_at, platform_fee, platform_fee_tax, manual_adjustment, net_amount, raw, companies(name), stores(local_name, cost_center)"
-        )
-        .eq("import_id", importRow.id)
-        .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
-      if (error) throw error;
-      const batch = (pageRows ?? []) as unknown as OrderQueryRow[];
-      rows.push(...batch);
-      if (batch.length < PAGE_SIZE) break;
-    }
-
-    const leaves: OrderLeaf[] = rows.map((row) => {
-      const fecha =
-        parseRawDateToISO(row.raw?.["Fecha_Original_Rappi"]) ??
-        (row.order_created_at ? row.order_created_at.slice(0, 10) : "sin-fecha");
-
-      return {
-        empresa: row.companies?.name ?? "(Sin empresa asignada)",
-        cc: row.stores?.cost_center ?? "-",
-        local: row.stores?.local_name ?? "(Sin local asignado)",
-        fecha,
-        ordenId: row.external_order_id,
-        metrics: extractMetrics(row),
-      };
-    });
-
-    data = buildHierarchy(leaves);
+  // Supabase limita cada consulta a ~1000 filas (max-rows de PostgREST) y un
+  // rango de fechas amplio puede superar eso, así que se pagina hasta agotar
+  // los datos. "order_created_at" (timestamptz, indexado) se usa como filtro:
+  // se verificó que su fecha coincide siempre con "Fecha_Original_Rappi".
+  const PAGE_SIZE = 1000;
+  const toExclusive = addDaysIso(to, 1);
+  const rows: OrderQueryRow[] = [];
+  for (let page = 0; ; page++) {
+    const { data: pageRows, error } = await supabaseAdmin
+      .from("orders")
+      .select(
+        "external_order_id, order_created_at, platform_fee, platform_fee_tax, manual_adjustment, net_amount, raw, companies(name), stores(local_name, cost_center)"
+      )
+      .eq("platform_id", platform.id)
+      .gte("order_created_at", `${from}T00:00:00Z`)
+      .lt("order_created_at", `${toExclusive}T00:00:00Z`)
+      .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
+    if (error) throw error;
+    const batch = (pageRows ?? []) as unknown as OrderQueryRow[];
+    rows.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
   }
 
+  const leaves: OrderLeaf[] = rows.map((row) => {
+    const fecha =
+      parseRawDateToISO(row.raw?.["Fecha_Original_Rappi"]) ??
+      (row.order_created_at ? row.order_created_at.slice(0, 10) : "sin-fecha");
+
+    return {
+      empresa: row.companies?.name ?? "(Sin empresa asignada)",
+      cc: row.stores?.cost_center ?? "-",
+      local: row.stores?.local_name ?? "(Sin local asignado)",
+      fecha,
+      ordenId: row.external_order_id,
+      metrics: extractMetrics(row),
+    };
+  });
+
+  const data = buildHierarchy(leaves);
   const companyCount = data.length;
   const totalOrders = data.reduce((acc, empresa) => acc + empresa.orderCount, 0);
 
@@ -105,16 +109,12 @@ export default async function DrilldownPage({
         eyebrow="Agregadores de delivery"
         title="Desglose"
         accent="jerárquico"
-        subtitle={`Empresa → Cc / Local → Fecha → Orden, semana ${selected.period_start} → ${selected.period_end}.`}
+        subtitle={`Empresa → Cc / Local → Fecha → Orden, del ${formatFechaLong(from)} al ${formatFechaLong(to)}.`}
         badges={[`${companyCount} empresas`, `${totalOrders} pedidos`]}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <PeriodSelector
-          periods={periods}
-          selectedKey={`${selected.period_start}_${selected.period_end}`}
-          basePath="/dashboard/drilldown"
-        />
+        <DateRangeSelector from={from} to={to} basePath="/dashboard/drilldown" />
         <div className="flex items-center gap-2">
           <Link
             href="/dashboard"
@@ -128,7 +128,7 @@ export default async function DrilldownPage({
 
       {data.length === 0 ? (
         <div className="rounded-lg border border-dashed border-zinc-300 p-12 text-center text-sm text-zinc-500 dark:border-zinc-700">
-          Esta semana no tiene pedidos importados.
+          No hay pedidos en ese rango de fechas.
         </div>
       ) : (
         <DrilldownGrid data={data} />
